@@ -1,0 +1,7 @@
+{
+  "name": "timelyApp",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}
