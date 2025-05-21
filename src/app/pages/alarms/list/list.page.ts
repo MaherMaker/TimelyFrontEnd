@@ -93,6 +93,7 @@ export class ListPage implements OnInit, OnDestroy {
 
     this.alarmSubscription = this.alarmService.loadAlarms().subscribe({
       next: (alarms) => {
+        console.log('ListPage: Alarms received from service:', alarms); // Log alarms received
         loading.dismiss();
         this.isLoading = false;
         console.log('Alarms loaded in component:', alarms);
@@ -132,10 +133,14 @@ export class ListPage implements OnInit, OnDestroy {
       return;
     }
     const alarmIdToToggle = alarm.id; // Ensures alarmIdToToggle is number
+    const newActiveState = !alarm.isActive; // Determine the new state
 
-    this.alarmService.toggleAlarmActive(alarmIdToToggle).subscribe({
+    this.alarmService.toggleAlarm(alarmIdToToggle, newActiveState).subscribe({
       next: (updatedAlarm: Alarm) => {
         console.log('Alarm toggle successful via HTTP', updatedAlarm);
+        // Optionally, update the local alarm state if your service doesn't automatically update the BehaviorSubject
+        // For example, by refetching alarms or updating the specific alarm in the local list.
+        // This depends on how alarmService.alarms$ is managed after an update.
       },
       error: async (error: Error) => {
         this.showToast(error.message || 'Failed to toggle alarm', 'danger');

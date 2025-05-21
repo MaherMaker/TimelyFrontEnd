@@ -1,0 +1,41 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Timely - Login</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="login-container">
+    <h1 class="ion-text-center">Timely Maher Edition</h1>
+    <p class="ion-text-center">Sign in to sync your alarms across devices</p>
+
+    <form [formGroup]="loginForm" (ngSubmit)="login()">
+      <ion-item>
+        <ion-label position="floating">Username or Email</ion-label>
+        <ion-input type="text" formControlName="usernameOrEmail"></ion-input>
+      </ion-item>
+      <div class="validation-error" *ngIf="loginForm.get('usernameOrEmail')?.invalid && loginForm.get('usernameOrEmail')?.touched">
+        <ion-text color="danger" *ngIf="loginForm.get('usernameOrEmail')?.errors?.['required']">Username or Email is required</ion-text>
+        <ion-text color="danger" *ngIf="loginForm.get('usernameOrEmail')?.errors?.['email']">Please enter a valid email</ion-text>
+      </div>
+
+      <ion-item>
+        <ion-label position="floating">Password</ion-label>
+        <ion-input type="password" formControlName="password"></ion-input>
+      </ion-item>
+      <div class="validation-error" *ngIf="loginForm.get('password')?.invalid && loginForm.get('password')?.touched">
+        <ion-text color="danger" *ngIf="loginForm.get('password')?.errors?.['required']">Password is required</ion-text>
+        <ion-text color="danger" *ngIf="loginForm.get('password')?.errors?.['minlength']">Password must be at least 6 characters</ion-text>
+      </div>
+
+      <div class="ion-margin-top">
+        <ion-button expand="block" type="submit" [disabled]="loginForm.invalid || isSubmitting">Login</ion-button>
+      </div>
+    </form>
+
+    <div class="ion-text-center ion-margin-top">
+      <p>Don't have an account?</p>
+      <ion-button fill="clear" (click)="goToRegister()">Register</ion-button>
+    </div>
+  </div>
+</ion-content>

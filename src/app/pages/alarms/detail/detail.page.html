@@ -1,0 +1,97 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/alarms/list"></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ isEditMode ? 'Edit Alarm' : 'New Alarm' }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <form [formGroup]="alarmForm" (ngSubmit)="saveAlarm()">
+    <ion-item>
+      <ion-label position="floating">Title</ion-label>
+      <ion-input type="text" formControlName="title"></ion-input>
+    </ion-item>
+
+    <ion-item>
+      <ion-label position="floating">Time</ion-label>
+      <ion-input type="time" formControlName="time"></ion-input>
+    </ion-item>
+
+    <ion-list-header>
+      <ion-label>Repeat</ion-label>
+    </ion-list-header>
+    <ion-item lines="none">
+      <ion-chip *ngFor="let day of weekDays" 
+                [color]="day.selected ? 'primary' : 'medium'" 
+                (click)="toggleDay(day)">
+        <ion-label>{{ day.name.substring(0, 3) }}</ion-label>
+      </ion-chip>
+    </ion-item>
+
+    <ion-list-header>
+      <ion-label>Sound Settings</ion-label>
+    </ion-list-header>
+    
+    <ion-item>
+      <ion-label>Sound</ion-label>
+      <ion-select interface="popover" formControlName="sound">
+        <ion-select-option value="default">Default</ion-select-option>
+        <ion-select-option value="chimes">Chimes</ion-select-option>
+        <ion-select-option value="bells">Bells</ion-select-option>
+        <ion-select-option value="digital">Digital</ion-select-option>
+        <ion-select-option value="melody">Melody</ion-select-option>
+      </ion-select>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Volume</ion-label>
+      <ion-range min="0" max="100" formControlName="volume">
+        <ion-icon size="small" slot="start" name="volume-low-outline"></ion-icon>
+        <ion-icon slot="end" name="volume-high-outline"></ion-icon>
+      </ion-range>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Vibration</ion-label>
+      <ion-toggle slot="end" formControlName="vibration"></ion-toggle>
+    </ion-item>
+
+    <ion-list-header>
+      <ion-label>Snooze Settings</ion-label>
+    </ion-list-header>
+
+    <ion-item>
+      <ion-label>Snooze Interval (minutes)</ion-label>
+      <ion-select interface="popover" formControlName="snoozeInterval">
+        <ion-select-option [value]="1">1</ion-select-option>
+        <ion-select-option [value]="5">5</ion-select-option>
+        <ion-select-option [value]="10">10</ion-select-option>
+        <ion-select-option [value]="15">15</ion-select-option>
+        <ion-select-option [value]="30">30</ion-select-option>
+      </ion-select>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Snooze Count</ion-label>
+      <ion-select interface="popover" formControlName="snoozeCount">
+        <ion-select-option [value]="0">No snooze</ion-select-option>
+        <ion-select-option [value]="1">1 time</ion-select-option>
+        <ion-select-option [value]="3">3 times</ion-select-option>
+        <ion-select-option [value]="5">5 times</ion-select-option>
+        <ion-select-option [value]="10">10 times</ion-select-option>
+      </ion-select>
+    </ion-item>
+
+    <ion-item>
+      <ion-label>Enabled</ion-label>
+      <ion-toggle slot="end" formControlName="isActive"></ion-toggle>
+    </ion-item>
+
+    <div class="ion-padding">
+      <ion-button expand="block" type="submit" [disabled]="alarmForm.invalid || isSubmitting">Save Alarm</ion-button>
+      <ion-button expand="block" fill="outline" type="button" (click)="cancel()">Cancel</ion-button>
+    </div>
+  </form>
+</ion-content>

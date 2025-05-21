@@ -1,0 +1,18 @@
+.register-container {
+  margin-top: 20px;
+  
+  h1 {
+    margin-bottom: 5px;
+  }
+  
+  p {
+    margin-bottom: 20px;
+    color: var(--ion-color-medium);
+  }
+  
+  .validation-error {
+    padding: 0 16px;
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+}

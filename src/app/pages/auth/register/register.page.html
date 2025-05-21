@@ -1,0 +1,59 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Timely - Register</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="register-container">
+    <h1 class="ion-text-center">Create an Account</h1>
+    <p class="ion-text-center">Join Timely to sync your alarms across devices</p>
+
+    <form [formGroup]="registerForm" (ngSubmit)="register()">
+      <ion-item>
+        <ion-label position="floating">Username</ion-label>
+        <ion-input type="text" formControlName="username"></ion-input>
+      </ion-item>
+      <div class="validation-error" *ngIf="registerForm.get('username')?.invalid && registerForm.get('username')?.touched">
+        <ion-text color="danger" *ngIf="registerForm.get('username')?.errors?.['required']">Username is required</ion-text>
+        <ion-text color="danger" *ngIf="registerForm.get('username')?.errors?.['minlength']">Username must be at least 3 characters</ion-text>
+      </div>
+
+      <ion-item>
+        <ion-label position="floating">Email</ion-label>
+        <ion-input type="email" formControlName="email"></ion-input>
+      </ion-item>
+      <div class="validation-error" *ngIf="registerForm.get('email')?.invalid && registerForm.get('email')?.touched">
+        <ion-text color="danger" *ngIf="registerForm.get('email')?.errors?.['required']">Email is required</ion-text>
+        <ion-text color="danger" *ngIf="registerForm.get('email')?.errors?.['email']">Please enter a valid email</ion-text>
+      </div>
+
+      <ion-item>
+        <ion-label position="floating">Password</ion-label>
+        <ion-input type="password" formControlName="password"></ion-input>
+      </ion-item>
+      <div class="validation-error" *ngIf="registerForm.get('password')?.invalid && registerForm.get('password')?.touched">
+        <ion-text color="danger" *ngIf="registerForm.get('password')?.errors?.['required']">Password is required</ion-text>
+        <ion-text color="danger" *ngIf="registerForm.get('password')?.errors?.['minlength']">Password must be at least 6 characters</ion-text>
+      </div>
+
+      <ion-item>
+        <ion-label position="floating">Confirm Password</ion-label>
+        <ion-input type="password" formControlName="confirmPassword"></ion-input>
+      </ion-item>
+      <div class="validation-error" *ngIf="registerForm.get('confirmPassword')?.invalid && registerForm.get('confirmPassword')?.touched">
+        <ion-text color="danger" *ngIf="registerForm.get('confirmPassword')?.errors?.['required']">Please confirm your password</ion-text>
+        <ion-text color="danger" *ngIf="registerForm.get('confirmPassword')?.errors?.['passwordMismatch']">Passwords do not match</ion-text>
+      </div>
+
+      <div class="ion-margin-top">
+        <ion-button expand="block" type="submit" [disabled]="registerForm.invalid || isSubmitting">Register</ion-button>
+      </div>
+    </form>
+
+    <div class="ion-text-center ion-margin-top">
+      <p>Already have an account?</p>
+      <ion-button fill="clear" (click)="goToLogin()">Login</ion-button>
+    </div>
+  </div>
+</ion-content>

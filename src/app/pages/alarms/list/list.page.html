@@ -1,0 +1,53 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Timely - My Alarms</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="syncAlarms()">
+        <ion-icon name="sync-outline" slot="icon-only"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <h1>My Alarms</h1>
+
+  <ion-button expand="full" color="tertiary" (click)="testNativeAlarm()">Test Native Alarm (Logs to Console/Logcat)</ion-button>
+
+  <ion-list *ngIf="(alarms$ | async) as alarms">
+    <div *ngIf="alarms && alarms.length > 0">
+      <ion-item-sliding *ngFor="let alarm of alarms">
+        <ion-item (click)="editAlarm(alarm, $event)" detail>
+          <ion-label>
+            <h2>{{ alarm.title }}</h2>
+            <p>{{ formatTime(alarm.time) }}</p>
+            <p>{{ formatDays(alarm.days) }}</p>
+          </ion-label>
+          <ion-toggle slot="end" [checked]="alarm.isActive" (ionChange)="toggleAlarm(alarm)" (click)="$event.stopPropagation()"></ion-toggle>
+        </ion-item>
+
+        <ion-item-options side="end">
+          <ion-item-option color="danger" (click)="deleteAlarm(alarm, $event)">
+            <ion-icon name="trash-outline" slot="icon-only"></ion-icon>
+          </ion-item-option>
+        </ion-item-options>
+      </ion-item-sliding>
+    </div>
+
+    <div *ngIf="!alarms || alarms.length === 0" class="ion-text-center ion-padding">
+      <ion-icon name="alarm-outline" style="font-size: 64px; opacity: 0.5;"></ion-icon>
+      <p>No alarms found</p>
+      <p>Create your first alarm to get started</p>
+    </div>
+  </ion-list>
+
+  <div *ngIf="!(alarms$ | async)" class="ion-text-center ion-padding">
+    <p>Loading alarms...</p> 
+  </div>
+
+  <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+    <ion-fab-button (click)="createAlarm()">
+      <ion-icon name="add"></ion-icon>
+    </ion-fab-button>
+  </ion-fab>
+</ion-content>
