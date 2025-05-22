@@ -4,7 +4,8 @@
 
 export const environment = {
   production: false,
-  apiUrl: 'https://shark-app-7ezaw.ondigitalocean.app/api' // Replaced ngrok URL with Cloudflare URL
+  apiUrl: 'https://shark-app-7ezaw.ondigitalocean.app/api'
+  // apiUrl: 'http://localhost:3000/api' // Replaced ngrok URL with Cloudflare URL
 };
 
 /*

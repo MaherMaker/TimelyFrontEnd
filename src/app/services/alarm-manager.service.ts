@@ -36,9 +36,9 @@ export interface PermissionStatusResult {
 }
 
 export interface AlarmEventData {
-  alarmId: string;
+  alarmId: string;       // This is the NATIVE alarmId (e.g., "timely-16")
   name?: string;
-  // ... any other data passed with events
+  extra?: { [key: string]: any; backendAlarmId?: number }; // Added extra field to carry backendAlarmId
 }
 // --- END: Plugin Specific Interfaces ---
 

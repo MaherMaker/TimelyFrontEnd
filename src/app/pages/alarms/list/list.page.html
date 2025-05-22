@@ -12,7 +12,7 @@
 <ion-content class="ion-padding">
   <h1>My Alarms</h1>
 
-  <ion-button expand="full" color="tertiary" (click)="testNativeAlarm()">Test Native Alarm (Logs to Console/Logcat)</ion-button>
+  <!-- <ion-button expand="full" color="tertiary" (click)="testNativeAlarm()">Test Native Alarm (Logs to Console/Logcat)</ion-button> -->
 
   <ion-list *ngIf="(alarms$ | async) as alarms">
     <div *ngIf="alarms && alarms.length > 0">

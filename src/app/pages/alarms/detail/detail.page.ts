@@ -95,31 +95,35 @@ export class DetailPage implements OnInit {
     await loading.present();
 
     this.alarmService.getAlarm(id).subscribe({
-      next: (alarm: Alarm | undefined) => { // Expecting Alarm or undefined
-        if (!alarm) {
+      next: (response: any) => { // Changed parameter name for clarity
+        console.log('Received alarm data from service:', JSON.stringify(response, null, 2)); 
+
+        const actualAlarm = response.alarm; // Access the nested alarm object
+
+        if (!actualAlarm) {
           loading.dismiss();
-          this.showToast('Alarm not found', 'danger');
+          this.showToast('Alarm data not found in response', 'danger'); // Clarified message
           this.router.navigateByUrl('/alarms/list');
           return;
         }
         loading.dismiss();
-        // Patch form values
+        // Patch form values using actualAlarm
         this.alarmForm.patchValue({
-          title: alarm.title,
-          time: alarm.time,
-          isActive: alarm.isActive,
-          sound: alarm.sound || 'default',
-          volume: alarm.volume !== undefined ? alarm.volume : 80,
-          vibration: alarm.vibration !== undefined ? alarm.vibration : true,
-          snoozeInterval: alarm.snoozeInterval || 5,
-          snoozeCount: alarm.snoozeCount || 3,
-          noRepeat: alarm.noRepeat !== undefined ? alarm.noRepeat : false
+          title: actualAlarm.title == null ? '' : actualAlarm.title,
+          time: actualAlarm.time == null ? '' : actualAlarm.time,
+          isActive: actualAlarm.isActive == null ? true : actualAlarm.isActive, 
+          sound: actualAlarm.sound || 'default', 
+          volume: actualAlarm.volume == null ? 80 : actualAlarm.volume, 
+          vibration: actualAlarm.vibration == null ? true : actualAlarm.vibration, 
+          snoozeInterval: actualAlarm.snoozeInterval == null ? 5 : actualAlarm.snoozeInterval, 
+          snoozeCount: actualAlarm.snoozeCount == null ? 3 : actualAlarm.snoozeCount, 
+          noRepeat: actualAlarm.noRepeat == null ? false : actualAlarm.noRepeat 
         });
+        console.log('Alarm form value after patchValue:', JSON.stringify(this.alarmForm.value, null, 2)); 
 
-        // Update selected days based on the number array
-        const selectedDayIds = alarm.days || []; // days is now number[]
+        // Update selected days based on the number array from actualAlarm
+        const selectedDayIds = actualAlarm.days || []; 
         this.weekDays.forEach(day => {
-          // Check if the day's numeric ID is included in the selectedDayIds array
           day.selected = selectedDayIds.includes(day.id);
         });
 
