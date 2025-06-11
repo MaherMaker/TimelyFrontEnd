@@ -72,6 +72,7 @@ export class AppComponent implements OnInit {
     // Initialize Push Notifications
     if (this.platform.is('capacitor')) {
       this.initializePushNotifications();
+      this.setupAlarmTriggerListener();
     } else {
       console.log('AppComponent: Push notifications are only available on a device.');
     }
@@ -260,6 +261,23 @@ export class AppComponent implements OnInit {
 
     // Listen for token refresh events
     console.log('AppComponent: Existing \'registration\' listener will handle token refreshes.');
+  }
+
+  /**
+   * Set up listeners for alarm triggers to handle one-time alarms
+   */
+  private async setupAlarmTriggerListener(): Promise<void> {
+    console.log('AppComponent: Setting up alarm trigger listeners');
+    try {
+      // Wait for auth initialization to complete
+      await this.authInitializationPromise;
+      
+      // Call the AlarmService's method to set up multiple listeners
+      await this.alarmService.setupMultipleAlarmEventListeners();
+      console.log('AppComponent: Alarm trigger listeners setup completed');
+    } catch (error) {
+      console.error('AppComponent: Error setting up alarm trigger listeners:', error);
+    }
   }
 
   /**

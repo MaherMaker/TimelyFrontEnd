@@ -510,9 +510,7 @@ export class AlarmService {
     // Simplified initial log to ensure it always runs if function is entered.
     console.log(`AlarmService: scheduleNativeAlarmIfNeeded ENTRY - ID: ${alarmInput?.id}, Active: ${alarmInput?.isActive}, Time: ${alarmInput?.time}, Days (raw): ${JSON.stringify(alarmInput?.days)}, NoRepeat: ${alarmInput?.noRepeat}`);
 
-    const alarm = { ...alarmInput }; // Work with a copy
-
-    // ** Normalize alarm.days **
+    const alarm = { ...alarmInput }; // Work with a copy    // ** Normalize alarm.days **
     if (typeof alarm.days === 'string') {
       try {
         const parsedDays = JSON.parse(alarm.days);
@@ -536,6 +534,30 @@ export class AlarmService {
       alarm.days = [];
     }
     // At this point, alarm.days should be a number[]
+    
+    // If days array is empty or undefined, ensure this is marked as a non-repeating alarm
+    if (!alarm.days || alarm.days.length === 0) {
+      if (alarm.noRepeat !== true) {
+        console.log(`AlarmService: scheduleNativeAlarmIfNeeded - Alarm ${alarm.id} has no days selected. Setting noRepeat=true.`);
+        alarm.noRepeat = true;
+        
+        // If the alarm is active, update it in the backend to ensure consistency
+        if (alarm.isActive && alarm.id) {
+          console.log(`AlarmService: scheduleNativeAlarmIfNeeded - Updating backend to set noRepeat=true for alarm ${alarm.id}`);
+          // Use a setTimeout to avoid blocking the current operation
+          setTimeout(() => {
+            this.updateAlarm(alarm.id!, { noRepeat: true }).subscribe({
+              next: (updatedAlarm) => {
+                console.log(`AlarmService: Auto-updated noRepeat for alarm ${alarm.id} in backend`);
+              },
+              error: (error) => {
+                console.error(`AlarmService: Failed to auto-update noRepeat for alarm ${alarm.id}:`, error);
+              }
+            });
+          }, 0);
+        }
+      }
+    }
   
     if (!alarm.id) {
       console.warn('AlarmService: scheduleNativeAlarmIfNeeded - EXITING: no alarm.id.', JSON.parse(JSON.stringify(alarm)));
@@ -652,5 +674,316 @@ export class AlarmService {
         await this.cancelNativeAlarmByNativeId(alarm.nativeAlarmId);
       }
     }
+  }
+  /**
+   * Set up a listener for alarm triggers to handle one-time alarms
+   * Called from the AppComponent to automatically disable non-repeating alarms
+   * @returns A promise that resolves when the listener is set up
+   */
+  setupAlarmTriggerListener(): Promise<void> {
+    console.log('AlarmService: Setting up alarm trigger listener');
+    
+    return new Promise<void>(async (resolve, reject) => {
+      try {
+        // We need to listen for 'alarmDismissed' event instead of 'alarm_triggered' based on the logs
+        const listenerHandle = await this.alarmManagerService.listenToAlarmTriggers('alarmDismissed', async (eventData) => {
+          console.log('AlarmService: Alarm dismissed:', eventData);
+          
+          // Parse the alarmId to extract the backend alarm ID
+          // Format is "timely-X" where X is the backend alarm ID
+          const alarmIdStr = eventData.alarmId || '';
+          let backendAlarmId: number | undefined = undefined;
+          
+          if (alarmIdStr.startsWith('timely-')) {
+            backendAlarmId = parseInt(alarmIdStr.substring(7), 10);
+          } else if (eventData.extra && eventData.extra.backendAlarmId !== undefined) {
+            // Fallback to extra data if available
+            backendAlarmId = eventData.extra.backendAlarmId;
+          }
+          
+          console.log(`AlarmService: Extracted backend alarm ID: ${backendAlarmId} from native ID: ${alarmIdStr}`);
+          
+          if (backendAlarmId !== undefined && !isNaN(backendAlarmId)) {
+            console.log(`AlarmService: Processing dismissed alarm with backend ID: ${backendAlarmId}`);
+            
+            // Get the alarm details to check if it's a non-repeating alarm            
+            const currentAlarms = this.alarmsSubject.getValue();
+            const triggeredAlarm = currentAlarms.find(alarm => alarm.id === backendAlarmId);
+            
+            // Log detailed alarm information for debugging
+            this.logAlarmDetails(backendAlarmId, 'alarmDismissed');
+            
+            // Use our dedicated method to check if this is a one-time alarm
+            const isOneTime = this.isOneTimeAlarm(triggeredAlarm);
+            
+            console.log(`AlarmService: Is alarm ${backendAlarmId} a one-time alarm? ${isOneTime}`);
+            
+            if (triggeredAlarm && isOneTime) {
+              console.log(`AlarmService: Alarm ${backendAlarmId} is a one-time alarm. Disabling it.`);
+              
+              try {
+                // Disable the alarm by setting isActive to false
+                this.toggleAlarm(backendAlarmId, false).subscribe({
+                  next: (updatedAlarm) => {
+                    console.log(`AlarmService: Successfully disabled one-time alarm ${backendAlarmId}`, updatedAlarm);
+                    // Update UI with a toast notification
+                    this.showToast('One-time alarm has been automatically disabled.', 'success');
+                  },
+                  error: (error) => {
+                    console.error(`AlarmService: Error disabling one-time alarm ${backendAlarmId}:`, error);
+                  }
+                });
+              } catch (error) {
+                console.error(`AlarmService: Error processing one-time alarm ${backendAlarmId}:`, error);
+              }
+            } else {
+              console.log(`AlarmService: Alarm ${backendAlarmId} is not a one-time alarm or was not found. No action needed.`);
+            }
+          } else {
+            console.warn('AlarmService: Could not extract backend alarm ID from event data:', eventData);
+          }
+        });
+        
+        console.log('AlarmService: Alarm trigger listener setup successfully');
+        resolve();
+      } catch (error) {
+        console.error('AlarmService: Failed to set up alarm trigger listener:', error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Set up redundant listeners for alarm events to ensure we catch all possible events
+   * That could indicate an alarm has triggered or been dismissed
+   * @returns A promise that resolves when all listeners are set up
+   */
+  setupMultipleAlarmEventListeners(): Promise<void> {
+    console.log('AlarmService: Setting up multiple alarm event listeners');
+    
+    return Promise.all([
+      this.setupAlarmTriggerListener(),
+      this.setupAlarmTriggeredListener()
+    ]).then(() => {
+      console.log('AlarmService: All alarm event listeners set up successfully');
+    }).catch(error => {
+      console.error('AlarmService: Error setting up some alarm event listeners:', error);
+      // We still resolve the promise even if some listeners failed
+    });
+  }
+  
+  /**
+   * Set up a listener specifically for the alarm_triggered event
+   * This provides redundancy in case alarmDismissed isn't fired
+   * @returns A promise that resolves when the listener is set up
+   */
+  private setupAlarmTriggeredListener(): Promise<void> {
+    console.log('AlarmService: Setting up alarm_triggered event listener');
+    
+    return new Promise<void>(async (resolve, reject) => {
+      try {
+        const listenerHandle = await this.alarmManagerService.listenToAlarmTriggers('alarm_triggered', async (eventData) => {
+          console.log('AlarmService: Alarm triggered event received:', eventData);
+          
+          if (eventData.extra && eventData.extra.backendAlarmId !== undefined) {
+            const backendAlarmId = eventData.extra.backendAlarmId;
+            console.log(`AlarmService: Processing triggered alarm with backend ID: ${backendAlarmId}`);
+            
+            // Get the alarm details to check if it's a non-repeating alarm
+            const currentAlarms = this.alarmsSubject.getValue();
+            const triggeredAlarm = currentAlarms.find(alarm => alarm.id === backendAlarmId);
+            
+            // Log detailed alarm information
+            this.logAlarmDetails(backendAlarmId, 'alarm_triggered');
+            
+            // Use our dedicated method to check if this is a one-time alarm
+            const isOneTime = this.isOneTimeAlarm(triggeredAlarm);
+            
+            console.log(`AlarmService: Is alarm ${backendAlarmId} a one-time alarm? ${isOneTime}`);
+            
+            if (triggeredAlarm && isOneTime) {
+              console.log(`AlarmService: Alarm ${backendAlarmId} is a one-time alarm. Disabling it.`);
+              
+              try {
+                // Disable the alarm by setting isActive to false
+                this.toggleAlarm(backendAlarmId, false).subscribe({
+                  next: (updatedAlarm) => {
+                    console.log(`AlarmService: Successfully disabled one-time alarm ${backendAlarmId}`, updatedAlarm);
+                    // Update UI with a toast notification
+                    this.showToast('One-time alarm has been automatically disabled.', 'success');
+                  },
+                  error: (error) => {
+                    console.error(`AlarmService: Error disabling one-time alarm ${backendAlarmId}:`, error);
+                  }
+                });
+              } catch (error) {
+                console.error(`AlarmService: Error processing one-time alarm ${backendAlarmId}:`, error);
+              }
+            } else {
+              console.log(`AlarmService: Alarm ${backendAlarmId} is not a one-time alarm or was not found. No action needed.`);
+            }
+          } else {
+            console.warn('AlarmService: Received alarm trigger without backendAlarmId in extra data:', eventData);
+          }
+        });
+        
+        console.log('AlarmService: alarm_triggered event listener setup successfully');
+        resolve();
+      } catch (error) {
+        console.error('AlarmService: Failed to set up alarm_triggered event listener:', error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Log detailed information about an alarm for debugging purposes
+   * @param alarmId The backend ID of the alarm
+   * @param context Additional context information
+   */  private logAlarmDetails(alarmId: number, context: string = 'general'): void {
+    const allAlarms = this.alarmsSubject.getValue();
+    const alarm = allAlarms.find(a => a.id === alarmId);
+    
+    if (alarm) {
+      // Normalize days for logging with enhanced error handling
+      let daysArray = [];
+      let parseError = null;
+        if (typeof alarm.days === 'string') {
+        try {
+          const parsed = JSON.parse(alarm.days);
+          daysArray = Array.isArray(parsed) ? parsed : [];
+        } catch (e: any) {
+          parseError = e.message || 'Unknown parsing error';
+          daysArray = [];
+        }
+      } else if (Array.isArray(alarm.days)) {
+        daysArray = alarm.days;
+      }
+      
+      // Check if this should be a one-time alarm based on days
+      const hasNoDays = daysArray.length === 0;
+      const shouldBeNoRepeat = hasNoDays;
+      const isCurrentlyNoRepeat = alarm.noRepeat === true;
+      
+      console.log(`AlarmService: [${context}] Alarm details for ID ${alarmId}:`, {
+        id: alarm.id,
+        title: alarm.title,
+        time: alarm.time,
+        days: daysArray,
+        daysRaw: alarm.days,
+        daysType: typeof alarm.days,
+        daysParseError: parseError,
+        hasNoDays: hasNoDays,
+        isActive: alarm.isActive,
+        noRepeat: alarm.noRepeat,
+        isCurrentlyNoRepeat: isCurrentlyNoRepeat,
+        shouldBeNoRepeat: shouldBeNoRepeat,
+        mismatchedNoRepeatFlag: shouldBeNoRepeat !== isCurrentlyNoRepeat,
+        willBeDetectedAsOneTime: isCurrentlyNoRepeat || hasNoDays,
+        nativeAlarmId: alarm.nativeAlarmId,
+        syncStatus: alarm.syncStatus
+      });
+      
+      // If there's a mismatch between days and noRepeat flag, log a warning
+      if (shouldBeNoRepeat && !alarm.noRepeat) {
+        console.warn(`AlarmService: [${context}] Alarm ${alarmId} has no days but noRepeat is false. This is inconsistent.`);
+      }
+    } else {
+      console.log(`AlarmService: [${context}] No alarm found with ID ${alarmId}`);
+    }
+  }
+
+  /**
+   * Fix any inconsistencies in alarm configuration
+   * Ensures alarms with no days are marked as noRepeat=true
+   */  private fixAlarmInconsistencies(alarms: AppAlarm[]): void {
+    console.log('AlarmService: Checking for alarm configuration inconsistencies');
+    
+    for (const alarm of alarms) {
+      // Normalize days array with enhanced error handling
+      let daysArray: number[] = [];
+      let parseError = null;
+      
+      if (typeof alarm.days === 'string') {        try {
+          const parsed = JSON.parse(alarm.days);
+          if (Array.isArray(parsed)) {
+            daysArray = parsed;
+          } else {
+            console.warn(`AlarmService: Days property for alarm ${alarm.id} is not an array after parsing:`, alarm.days);
+            daysArray = [];
+          }
+        } catch (e: any) {
+          parseError = e.message || 'Unknown parsing error';
+          console.warn(`AlarmService: Failed to parse days for alarm ${alarm.id}: ${parseError}, raw value:`, alarm.days);
+          daysArray = [];
+        }
+      } else if (Array.isArray(alarm.days)) {
+        daysArray = alarm.days;
+      } else if (alarm.days === undefined || alarm.days === null) {
+        console.warn(`AlarmService: Days property for alarm ${alarm.id} is ${alarm.days}`);
+        daysArray = [];
+      } else {
+        console.warn(`AlarmService: Unexpected days property type for alarm ${alarm.id}:`, typeof alarm.days);
+        daysArray = [];
+      }
+      
+      // Check if this should be a noRepeat alarm (no days selected)
+      const hasNoDays = daysArray.length === 0;
+      
+      // If it has no days but noRepeat is false, fix it
+      if (hasNoDays && alarm.noRepeat === false && alarm.id) {
+        console.log(`AlarmService: Found inconsistency - Alarm ${alarm.id} has no days but noRepeat=false. Fixing...`);
+        
+        // Update the alarm locally
+        alarm.noRepeat = true;
+        
+        // Update in backend
+        this.updateAlarm(alarm.id, { noRepeat: true }).subscribe({
+          next: (updated) => console.log(`AlarmService: Successfully fixed noRepeat inconsistency for alarm ${alarm.id}`),
+          error: (err) => console.error(`AlarmService: Error fixing noRepeat inconsistency for alarm ${alarm.id}:`, err)
+        });
+      }
+    }
+  }
+
+  /**
+   * Determines if an alarm should be treated as a one-time (non-repeating) alarm
+   * @param alarm The alarm to check
+   * @returns true if the alarm is one-time, false otherwise
+   */
+  private isOneTimeAlarm(alarm: AppAlarm | undefined): boolean {
+    if (!alarm) {
+      return false;
+    }
+    
+    // If noRepeat flag is explicitly set to true, it's a one-time alarm
+    if (alarm.noRepeat === true) {
+      return true;
+    }
+    
+    // Check if the days property indicates a one-time alarm (empty array)
+    const days = alarm.days;
+    let daysArray: any[] = [];
+    
+    if (typeof days === 'string') {
+      // Common string patterns that represent empty arrays
+      if (days === '[]' || days === '' || days === '""' || days === 'null') {
+        return true;
+      }
+      
+      // Try to parse JSON
+      try {
+        const parsed = JSON.parse(days);
+        daysArray = Array.isArray(parsed) ? parsed : [];
+      } catch (e: any) {
+        // If parsing fails, treat as empty
+        return true;
+      }
+    } else if (Array.isArray(days)) {
+      daysArray = days;
+    }
+    
+    // If days array is empty, it's a one-time alarm
+    return daysArray.length === 0;
   }
 }
